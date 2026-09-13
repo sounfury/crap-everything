@@ -14,18 +14,35 @@ final class CoverageRunner {
         this.executor = executor;
     }
 
-    void generateCoverage(Path projectRoot) throws Exception {
-        deleteIfExists(projectRoot.resolve("target/site/jacoco"));
-        deleteIfExists(projectRoot.resolve("target/jacoco.exec"));
+    void generateCoverage(Path projectRoot) {
+        try {
+            deleteIfExists(projectRoot.resolve("target/site/jacoco"));
+            deleteIfExists(projectRoot.resolve("target/jacoco.exec"));
 
-        int exit = executor.run(List.of(
-                "mvn", "-q",
-                "org.jacoco:jacoco-maven-plugin:0.8.12:prepare-agent",
-                "test",
-                "org.jacoco:jacoco-maven-plugin:0.8.12:report"
-        ), projectRoot);
-        if (exit != 0) {
-            throw new IllegalStateException("Coverage command failed with exit " + exit);
+            String os = System.getProperty("os.name", "").toLowerCase();
+            List<String> command;
+            if (os.contains("win")) {
+                command = List.of(
+                        "cmd.exe", "/c", "mvn", "-q",
+                        "org.jacoco:jacoco-maven-plugin:0.8.12:prepare-agent",
+                        "test",
+                        "org.jacoco:jacoco-maven-plugin:0.8.12:report"
+                );
+            } else {
+                command = List.of(
+                        "mvn", "-q",
+                        "org.jacoco:jacoco-maven-plugin:0.8.12:prepare-agent",
+                        "test",
+                        "org.jacoco:jacoco-maven-plugin:0.8.12:report"
+                );
+            }
+
+            int exit = executor.run(command, projectRoot);
+            if (exit != 0) {
+                System.err.println("Warning: Coverage command exited with " + exit);
+            }
+        } catch (Exception ex) {
+            System.err.println("Warning: Coverage command could not be executed: " + ex.getMessage());
         }
     }
 
