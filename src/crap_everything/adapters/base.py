@@ -27,12 +27,19 @@ class AnalysisOptions:
     # 分析超时时间（秒）
     timeout: int = 300
 
+    # 仅度量复杂度，不运行测试。
+    complexity_only: bool = False
+
 
 class BaseAdapter(ABC):
     # 语言标识，如 "python", "java"
     language: str = "unknown"
     # 显示名称
     display_name: str = "Unknown Language"
+
+    def owns_subprojects(self, project_path: Path) -> bool:
+        # 构建根目录是否需要统一分析其模块，默认仍逐个发现子项目。
+        return False
 
     @abstractmethod
     def detect(self, project_path: Path) -> bool:

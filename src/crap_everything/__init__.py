@@ -3,6 +3,7 @@ from crap_everything.adapters import (
     AnalysisOptions,
     BaseAdapter,
     JavaAdapter,
+    KotlinAdapter,
     PythonAdapter,
     get_global_registry,
 )
@@ -24,6 +25,7 @@ __all__ = [
     "BaseAdapter",
     "PythonAdapter",
     "JavaAdapter",
+    "KotlinAdapter",
     "AdapterRegistry",
     "get_global_registry",
     "AnalysisOptions",

@@ -65,6 +65,9 @@ class PythonAdapter(BaseAdapter):
         return "src"
 
     def run(self, project_path: Path, options: AnalysisOptions) -> ProjectReport:
+        if options.complexity_only:
+            from crap_everything.source_complexity import analyze_source_complexity
+            return analyze_source_complexity(project_path, options, self.language)
         start_time = time.perf_counter()
         project_name = project_path.name
 

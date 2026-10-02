@@ -11,17 +11,20 @@ from crap_everything.formatters import (
     format_json,
     format_markdown,
     format_text,
+    format_complexity,
 )
 from crap_everything.runner import AnalysisRunner
+from crap_everything.models import AggregatedReport
 from crap_everything.scanner import scan_projects
 
 __version__ = "0.1.0"
 
 
-def build_parser() -> argparse.ArgumentParser:
+def build_parser(complexity_only: bool = False) -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        prog="crap",
-        description="CRAP Everything: 跨语言、多项目 CRAP 质量度量统一门面工具",
+        prog="crap complexity" if complexity_only else "crap",
+        description="仅分析圈复杂度，不运行测试" if complexity_only else "CRAP Everything: 跨语言、多项目 CRAP 质量度量统一门面工具",
+        epilog=None if complexity_only else "仅看复杂度：crap complexity [项目路径]；项目门禁：crap init / crap check / crap hook install",
     )
     parser.add_argument(
         "paths",
@@ -52,35 +55,34 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="--output markdown 的简写",
     )
-    parser.add_argument(
-        "--fail-on-crap",
-        type=float,
-        default=None,
-        help="若任何函数/方法的 CRAP 分数 >= 该阈值，则退出码为 2",
-    )
+    parser.set_defaults(fail_on_crap=None, fail_on_coverage_below=None)
+    if not complexity_only:
+        parser.add_argument(
+            "--fail-on-crap", type=float, default=None,
+            help="若任何函数/方法的 CRAP 分数 >= 该阈值，则退出码为 2",
+        )
     parser.add_argument(
         "--fail-on-complexity",
         type=int,
         default=None,
         help="若任何函数的圈复杂度 >= 该阈值，则视为超标",
     )
-    parser.add_argument(
-        "--fail-on-coverage-below",
-        type=float,
-        default=None,
-        help="若任何函数的覆盖率低于该百分比，则视为超标",
-    )
+    if not complexity_only:
+        parser.add_argument(
+            "--fail-on-coverage-below", type=float, default=None,
+            help="若任何函数的覆盖率低于该百分比，则视为超标",
+        )
     parser.add_argument(
         "--top",
         type=int,
         default=20,
-        help="展示高危函数列表的最大条目数 (默认: 20，0 表示全部)",
+        help="展示函数列表的最大条目数 (默认: 20，0 表示全部)",
     )
     parser.add_argument(
         "--lang",
         type=str,
         default=None,
-        help="强制指定语言适配器 (如 python, java)，跳过自动探测",
+        help="强制指定语言适配器 (python, java, kotlin)",
     )
     parser.add_argument(
         "--recursive",
@@ -115,8 +117,15 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main(args: list[str] | None = None) -> None:
-    parser = build_parser()
-    parsed_args = parser.parse_args(args)
+    arguments = list(sys.argv[1:] if args is None else args)
+    if arguments and arguments[0] in ("init", "check", "hook"):
+        from crap_everything.gate import main as gate_main
+        sys.exit(gate_main(arguments))
+    complexity_only = bool(arguments and arguments[0] == "complexity")
+    if complexity_only:
+        arguments.pop(0)
+    parser = build_parser(complexity_only)
+    parsed_args = parser.parse_args(arguments)
 
     fmt = parsed_args.output
     if parsed_args.json:
@@ -125,6 +134,8 @@ def main(args: list[str] | None = None) -> None:
         fmt = "markdown"
 
     registry = get_global_registry()
+    if parsed_args.lang and registry.get_by_language(parsed_args.lang) is None:
+        parser.error(f"不支持的语言: {parsed_args.lang}")
     target_paths = [Path(p) for p in parsed_args.paths]
 
     targets = scan_projects(
@@ -136,12 +147,14 @@ def main(args: list[str] | None = None) -> None:
 
     if not targets:
         if fmt == "json":
-            print(format_json(AggregatedReport()))
+            print(format_complexity(AggregatedReport(), "json") if complexity_only
+                  else format_json(AggregatedReport()))
         else:
-            print("未在指定路径下检测到受支持的项目 (crap4java 或 crap4py)", file=sys.stderr)
+            print("未在指定路径下检测到受支持的项目 (Java、Python 或 Kotlin JVM)", file=sys.stderr)
         sys.exit(0)
 
     options = AnalysisOptions(
+        complexity_only=complexity_only,
         src_dir=parsed_args.src,
         fail_on_crap=parsed_args.fail_on_crap,
         fail_on_complexity=parsed_args.fail_on_complexity,
@@ -156,7 +169,9 @@ def main(args: list[str] | None = None) -> None:
 
     top_n = None if parsed_args.top <= 0 else parsed_args.top
 
-    if fmt == "json":
+    if complexity_only:
+        print(format_complexity(report, fmt, top_n))
+    elif fmt == "json":
         print(format_json(report))
     elif fmt == "markdown":
         print(format_markdown(report, top_n=top_n))

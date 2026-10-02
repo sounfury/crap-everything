@@ -147,3 +147,75 @@ def format_csv(report: AggregatedReport) -> str:
         ])
 
     return output.getvalue()
+
+
+def format_complexity(report: AggregatedReport, output_format: str = "text", top_n: int | None = 20) -> str:
+    entries = sorted((e for p in report.reports for e in p.entries), key=lambda e: -e.complexity)
+    shown = entries[:top_n] if top_n else entries
+
+    def status(project):
+        if project.error_message or project.exit_code == 1:
+            return "FAILED"
+        return "VIOLATION" if project.exit_code == 2 else "PASSED"
+
+    def entry_dict(entry):
+        return {key: getattr(entry, key) for key in ("project", "language", "symbol", "location", "complexity")}
+
+    def project_dict(project):
+        complexities = [e.complexity for e in project.entries]
+        return {
+            "project_name": project.project_name, "project_path": project.project_path,
+            "language": project.language, "total_methods": project.total_methods,
+            "max_complexity": max(complexities, default=None),
+            "avg_complexity": round(sum(complexities) / len(complexities), 2) if complexities else None,
+            "exit_code": project.exit_code, "error_message": project.error_message,
+            "elapsed_seconds": round(project.elapsed_seconds, 3),
+            "entries": [entry_dict(e) for e in sorted(project.entries, key=lambda e: -e.complexity)],
+        }
+
+    if output_format == "json":
+        return json.dumps({
+            "mode": "complexity", "total_projects": report.total_projects,
+            "total_methods": report.total_methods,
+            "global_max_complexity": max((e.complexity for e in entries), default=None),
+            "overall_exit_code": report.determine_exit_code(),
+            "projects": [project_dict(p) for p in report.reports],
+        }, indent=2, ensure_ascii=False)
+    if output_format == "csv":
+        stream = io.StringIO()
+        writer = csv.writer(stream)
+        writer.writerow(["Project", "Language", "Symbol", "Location", "Complexity"])
+        for entry in entries:
+            writer.writerow(entry_dict(entry).values())
+        return stream.getvalue()
+    if output_format == "markdown":
+        lines = ["# Complexity Report", "", "| Project | Language | Methods | Max CC | Avg CC | Status |",
+                 "|---|---|---:|---:|---:|---|"]
+        for project in report.reports:
+            data = project_dict(project)
+            lines.append(f"| {project.project_name} | {project.language} | {project.total_methods} | "
+                         f"{data['max_complexity']} | {data['avg_complexity']} | {status(project)} |")
+            if project.error_message:
+                lines.extend(["", f"Error: {project.error_message}", ""])
+        lines.extend(["", "| Symbol | Project | CC | Location |", "|---|---|---:|---|"])
+        for entry in shown:
+            symbol = entry.symbol.replace('|', '\\|')
+            location = entry.location.replace('|', '\\|')
+            lines.append(f"| `{symbol}` | {entry.project} | {entry.complexity} | `{location}` |")
+        return '\n'.join(lines)
+    lines = ["Complexity Report", "=" * 80,
+             f"{'Project':<24} {'Language':<10} {'Methods':>8} {'Max CC':>8} {'Avg CC':>8} {'Status':>10}"]
+    for project in report.reports:
+        data = project_dict(project)
+        avg = f"{data['avg_complexity']:.2f}" if data['avg_complexity'] is not None else "N/A"
+        maximum = str(data['max_complexity']) if data['max_complexity'] is not None else "N/A"
+        lines.append(f"{project.project_name:<24} {project.language:<10} {project.total_methods:>8} "
+                     f"{maximum:>8} {avg:>8} {status(project):>10}")
+        if project.error_message:
+            lines.append(f"  [Error] {project.error_message}")
+    lines.extend(["", f"Most Complex Functions / Methods (Top {len(shown)})", "-" * 80])
+    for entry in shown:
+        lines.append(f"CC {entry.complexity:>3}  {entry.symbol.split('(', 1)[0]}  [{entry.project}]  {entry.location}")
+    if not entries:
+        lines.append("No analyzed methods found.")
+    return '\n'.join(lines)

@@ -3,6 +3,7 @@ from __future__ import annotations
 import os
 import re
 import subprocess
+import sys
 import time
 from pathlib import Path
 
@@ -37,11 +38,14 @@ class JavaAdapter(BaseAdapter):
     def _locate_or_build_jar(self, repo_root: Path) -> Path | None:
         crap4java_dir = repo_root / "crap4java"
         if not crap4java_dir.exists():
-            return None
+            crap4java_dir = Path(sys.prefix) / "share" / "crap-everything" / "crap4java"
+            if not crap4java_dir.exists():
+                return None
 
         target_dir = crap4java_dir / "target"
         jar_path = target_dir / "crap4java-0.1.0-SNAPSHOT.jar"
-        if jar_path.exists():
+        java_files = list((crap4java_dir / "src" / "crap4java").glob("*.java"))
+        if jar_path.exists() and all(f.stat().st_mtime_ns <= jar_path.stat().st_mtime_ns for f in java_files):
             return jar_path
 
         # 若 jar 不存在，利用 javac 和 jar 工具进行快速打包
@@ -80,6 +84,9 @@ class JavaAdapter(BaseAdapter):
         return None
 
     def run(self, project_path: Path, options: AnalysisOptions) -> ProjectReport:
+        if options.complexity_only:
+            from crap_everything.source_complexity import analyze_source_complexity
+            return analyze_source_complexity(project_path, options, self.language)
         start_time = time.perf_counter()
         project_name = project_path.name
 
