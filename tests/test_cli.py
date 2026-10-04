@@ -49,3 +49,33 @@ def test_cli_main_exit_codes(mock_runner_cls, mock_scan):
         main(["dummy", "--fail-on-crap", "10"])
 
     assert exc.value.code == 2
+
+
+def _python_project(tmp_path):
+    tmp_path.mkdir(parents=True, exist_ok=True)
+    (tmp_path / "pyproject.toml").write_text("[project]\nname = 'demo'\n", encoding="utf-8")
+    source = tmp_path / "src" / "demo"
+    source.mkdir(parents=True)
+    (source / "core.py").write_text("def pick(x):\n    if x:\n        return 1\n    return 0\n", encoding="utf-8")
+    return tmp_path
+
+
+def test_complexity_json_exposes_file_and_line(tmp_path, capsys):
+    import json
+    project = _python_project(tmp_path)
+    with pytest.raises(SystemExit) as exit_info:
+        main(["complexity", str(project), "--json"])
+    assert exit_info.value.code == 0
+    entry = json.loads(capsys.readouterr().out)["projects"][0]["entries"][0]
+    assert (entry["file"], entry["line"], entry["complexity"]) == ("src/demo/core.py", 1, 2)
+    assert list(project.rglob("*.json")) == []
+
+
+def test_report_is_written_only_when_requested(tmp_path, capsys):
+    import json
+    project = _python_project(tmp_path / "project")
+    report = tmp_path / "out" / "report.json"
+    with pytest.raises(SystemExit):
+        main(["complexity", str(project), "--report", str(report)])
+    assert "Complexity Report" in capsys.readouterr().out
+    assert json.loads(report.read_text(encoding="utf-8"))["mode"] == "complexity"

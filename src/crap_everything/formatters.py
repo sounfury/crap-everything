@@ -161,6 +161,14 @@ def format_complexity(report: AggregatedReport, output_format: str = "text", top
     def entry_dict(entry):
         return {key: getattr(entry, key) for key in ("project", "language", "symbol", "location", "complexity")}
 
+    def located_dict(entry):
+        # 复杂度位置统一为“相对项目的路径:行号”，拆开后便于其他工具按文件对应。
+        data = entry_dict(entry)
+        file, _, line = entry.location.rpartition(":")
+        if file and line.isdigit():
+            data.update(file=file, line=int(line))
+        return data
+
     def project_dict(project):
         complexities = [e.complexity for e in project.entries]
         return {
@@ -170,7 +178,7 @@ def format_complexity(report: AggregatedReport, output_format: str = "text", top
             "avg_complexity": round(sum(complexities) / len(complexities), 2) if complexities else None,
             "exit_code": project.exit_code, "error_message": project.error_message,
             "elapsed_seconds": round(project.elapsed_seconds, 3),
-            "entries": [entry_dict(e) for e in sorted(project.entries, key=lambda e: -e.complexity)],
+            "entries": [located_dict(e) for e in sorted(project.entries, key=lambda e: -e.complexity)],
         }
 
     if output_format == "json":

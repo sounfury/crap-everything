@@ -73,6 +73,13 @@ def build_parser(complexity_only: bool = False) -> argparse.ArgumentParser:
             help="若任何函数的覆盖率低于该百分比，则视为超标",
         )
     parser.add_argument(
+        "--report",
+        type=Path,
+        default=None,
+        metavar="FILE",
+        help="同时将 JSON 报告导出到该文件；不指定时不写任何文件",
+    )
+    parser.add_argument(
         "--top",
         type=int,
         default=20,
@@ -116,6 +123,14 @@ def build_parser(complexity_only: bool = False) -> argparse.ArgumentParser:
     return parser
 
 
+def _export_report(path: Path | None, content: str) -> None:
+    # 报告只在显式指定 --report 时导出，避免在用户项目里留下文件。
+    if path is None:
+        return
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(content + "\n", encoding="utf-8")
+
+
 def main(args: list[str] | None = None) -> None:
     arguments = list(sys.argv[1:] if args is None else args)
     if arguments and arguments[0] in ("init", "check", "hook"):
@@ -146,9 +161,11 @@ def main(args: list[str] | None = None) -> None:
     )
 
     if not targets:
+        empty_json = (format_complexity(AggregatedReport(), "json") if complexity_only
+                      else format_json(AggregatedReport()))
+        _export_report(parsed_args.report, empty_json)
         if fmt == "json":
-            print(format_complexity(AggregatedReport(), "json") if complexity_only
-                  else format_json(AggregatedReport()))
+            print(empty_json)
         else:
             print("未在指定路径下检测到受支持的项目 (Java、Python 或 Kotlin JVM)", file=sys.stderr)
         sys.exit(0)
@@ -168,6 +185,9 @@ def main(args: list[str] | None = None) -> None:
     report = runner.run_all(targets)
 
     top_n = None if parsed_args.top <= 0 else parsed_args.top
+    if parsed_args.report:
+        _export_report(parsed_args.report,
+                       format_complexity(report, "json") if complexity_only else format_json(report))
 
     if complexity_only:
         print(format_complexity(report, fmt, top_n))

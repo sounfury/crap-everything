@@ -96,6 +96,7 @@ crap ./crap4java ./crap4py /path/to/another_project
 | `--output <format>` | `-o` | 输出格式：`text` (默认), `json`, `markdown`, `csv` | `crap . -o markdown` |
 | `--json` | - | 快捷输出完整 JSON 结构化数据 | `crap . --json` |
 | `--markdown` | - | 快捷输出 Markdown 报告（适合嵌入 PR / CI 构建报告） | `crap . --markdown` |
+| `--report <file>` | - | 同时将 JSON 报告导出到文件；不指定时不写任何文件 | `crap complexity . --report build/crap.json` |
 | `--top <n>` | - | 展示高危函数清单的最大数量（默认: 20，`0` 表示全部） | `crap . --top 10` |
 | `--src <dir>` | - | 指定源码目录名（默认自动智能探测 `src` 或 `app` 等） | `crap . --src app` |
 | `--changed` | - | 仅分析版本控制（Git）中发生变更的代码文件 | `crap . --changed` |
@@ -118,6 +119,7 @@ crap complexity . --changed --exclude generated
 ```
 
 支持 Java、Python 和 Kotlin JVM，结果按复杂度从高到低排列。
+JSON 中每个函数除 `location`（`相对路径:行号`）外，还提供拆开的 `file`（相对 `project_path`）和 `line`，便于 arch-view 等工具按文件对应。
 Java 使用已有 Java 语法树解析器，Python 使用与 CRAP 相同口径的 AST 决策点计数，均无需运行或编译目标项目。
 Kotlin 使用 Tree-sitter 解析源码语法树，无需 JDK、Gradle/Maven、生产代码依赖或编译产物；不编译或运行目标项目。
 
