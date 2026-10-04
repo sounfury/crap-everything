@@ -131,7 +131,17 @@ def _export_report(path: Path | None, content: str) -> None:
     path.write_text(content + "\n", encoding="utf-8")
 
 
+def _use_utf8_output() -> None:
+    # Windows 上输出到管道（Git Bash、Git 钩子、IDE）时 Python 默认用本地编码（如 GBK），
+    # 这些终端按 UTF-8 显示就会乱码；真正的控制台窗口不受影响。
+    for stream in (sys.stdout, sys.stderr):
+        encoding = (getattr(stream, "encoding", None) or "").lower().replace("-", "")
+        if encoding != "utf8" and hasattr(stream, "reconfigure"):
+            stream.reconfigure(encoding="utf-8", errors="replace")
+
+
 def main(args: list[str] | None = None) -> None:
+    _use_utf8_output()
     arguments = list(sys.argv[1:] if args is None else args)
     if arguments and arguments[0] in ("init", "check", "hook"):
         from crap_everything.gate import main as gate_main

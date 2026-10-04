@@ -79,3 +79,15 @@ def test_report_is_written_only_when_requested(tmp_path, capsys):
         main(["complexity", str(project), "--report", str(report)])
     assert "Complexity Report" in capsys.readouterr().out
     assert json.loads(report.read_text(encoding="utf-8"))["mode"] == "complexity"
+
+
+def test_output_switches_to_utf8_for_local_code_pages(monkeypatch):
+    import io
+    import sys
+    from crap_everything.cli import _use_utf8_output
+    stdout = io.TextIOWrapper(io.BytesIO(), encoding="gbk")
+    monkeypatch.setattr(sys, "stdout", stdout)
+    _use_utf8_output()
+    print("门禁通过")
+    stdout.flush()
+    assert stdout.buffer.getvalue().decode("utf-8").strip() == "门禁通过"
