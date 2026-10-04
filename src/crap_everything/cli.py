@@ -89,7 +89,7 @@ def build_parser(complexity_only: bool = False) -> argparse.ArgumentParser:
         "--lang",
         type=str,
         default=None,
-        help="强制指定语言适配器 (python, java, kotlin)",
+        help="强制指定语言适配器 (python, java, kotlin, clojure)",
     )
     parser.add_argument(
         "--recursive",
@@ -167,7 +167,7 @@ def main(args: list[str] | None = None) -> None:
         if fmt == "json":
             print(empty_json)
         else:
-            print("未在指定路径下检测到受支持的项目 (Java、Python 或 Kotlin JVM)", file=sys.stderr)
+            print("未在指定路径下检测到受支持的项目 (Java、Python、Kotlin JVM 或 Clojure)", file=sys.stderr)
         sys.exit(0)
 
     options = AnalysisOptions(

@@ -63,8 +63,8 @@ def load_config(project: Path) -> GateConfig:
             raise ValueError(f"{CONFIG_NAME}: 不支持的配置项 {section}.{sorted(unknown)[0]}")
     project_data, gate = data.get("project", {}), data.get("gate", {})
     language = project_data.get("language")
-    if language is not None and language not in ("java", "python", "kotlin"):
-        raise ValueError("project.language 必须为 java、python 或 kotlin")
+    if language is not None and language not in ("java", "python", "kotlin", "clojure"):
+        raise ValueError("project.language 必须为 java、python、kotlin 或 clojure")
     src = project_data.get("src")
     if src is not None and (not isinstance(src, str) or not src):
         raise ValueError("project.src 必须为非空字符串")
@@ -209,7 +209,7 @@ def main(arguments: list[str]) -> int:
     commands = parser.add_subparsers(dest="command", required=True)
     init = commands.add_parser("init", help="创建 crap.toml，不覆盖已有配置")
     init.add_argument("path", nargs="?", default=".")
-    init.add_argument("--lang", choices=["java", "python", "kotlin"])
+    init.add_argument("--lang", choices=["java", "python", "kotlin", "clojure"])
     init.add_argument("--max-complexity", type=int, default=12, help="最高允许复杂度（默认 12）")
     checking = commands.add_parser("check", help="按 crap.toml 执行门禁")
     checking.add_argument("path", nargs="?", default=".")
@@ -237,7 +237,7 @@ def main(arguments: list[str]) -> int:
             adapter = get_global_registry().detect(project)
             language = adapter.language if adapter else None
         if language is None:
-            raise ValueError("无法识别项目语言，请使用 --lang java/python/kotlin")
+            raise ValueError("无法识别项目语言，请使用 --lang java/python/kotlin/clojure")
         config = project / CONFIG_NAME
         with config.open("x", encoding="utf-8", newline="\n") as stream:
             stream.write(f'''[project]

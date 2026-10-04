@@ -2,7 +2,7 @@
 
 跨语言、多项目的 **CRAP** (Change Risk Anti-Pattern) 代码质量与变更风险统一门面度量工具。
 
-通过抽象层与插件式适配器架构，将不同语言底层的圈复杂度分析工具与测试覆盖率工具（如针对 Java 的 `crap4java`、针对 Python 的 `crap4py`）统一汇聚，支持**单命令同时扫描分析多个项目**，并输出统一的汇总表格、全局风险函数排行及 CI/CD 质量门禁状态。
+通过抽象层与插件式适配器架构，将不同语言底层的圈复杂度分析工具与测试覆盖率工具（如针对 Java 的 `crap4java`、针对 Python 的 `crap4py`、针对 Clojure 的 `crap4clj`）统一汇聚，支持**单命令同时扫描分析多个项目**，并输出统一的汇总表格、全局风险函数排行及 CI/CD 质量门禁状态。
 
 ---
 
@@ -63,7 +63,7 @@ uv run crap [参数...]
 crap .
 ```
 
-工具会自动识别各子项目的编程语言（Java、Python、Kotlin JVM），分别驱动底层度量套件，并输出整齐的跨项目概览与 Top 20 高危函数清单。
+工具会自动识别各子项目的编程语言（Java、Python、Kotlin JVM、Clojure），分别驱动底层度量套件，并输出整齐的跨项目概览与 Top 20 高危函数清单。
 
 ---
 
@@ -118,10 +118,11 @@ crap complexity . --fail-on-complexity 10 --markdown
 crap complexity . --changed --exclude generated
 ```
 
-支持 Java、Python 和 Kotlin JVM，结果按复杂度从高到低排列。
+支持 Java、Python、Kotlin JVM 和 Clojure，结果按复杂度从高到低排列。
 JSON 中每个函数除 `location`（`相对路径:行号`）外，还提供拆开的 `file`（相对 `project_path`）和 `line`，便于 arch-view 等工具按文件对应。
 Java 使用已有 Java 语法树解析器，Python 使用与 CRAP 相同口径的 AST 决策点计数，均无需运行或编译目标项目。
 Kotlin 使用 Tree-sitter 解析源码语法树，无需 JDK、Gradle/Maven、生产代码依赖或编译产物；不编译或运行目标项目。
+Clojure 使用移植自 crap4clj 的源码计数，无需 JVM 或 Clojure CLI。
 
 `--fail-on-complexity N` 对全部方法判断，任何方法 CC >= N 时退出码为 `2`；`--top` 仅限制文本/Markdown 展示条数。
 该子命令支持 `--lang`、`--src`、`--exclude`、`--changed`、`--timeout` 和所有输出格式；不接受 `--fail-on-crap` 或 `--fail-on-coverage-below`。
@@ -166,6 +167,21 @@ uv run --extra dev pytest tests/acceptance
 
 ---
 
+## Clojure 支持
+
+含 `deps.edn`、`project.clj`、`bb.edn`、`shadow-cljs.edn` 或 `build.boot` 的目录识别为 Clojure 项目，默认扫描 `src` 下的 `.clj`、`.cljc`、`.cljs`、`.bb`（`--src` 可改）：
+
+```bash
+crap complexity /path/to/clojure-project   # 只看复杂度，无需 JVM
+crap /path/to/clojure-project              # CRAP：调用随附的 crap4clj 运行 Cloverage
+```
+
+复杂度逐行移植自 Uncle Bob 的 [crap4clj](https://github.com/unclebob/crap4clj)（随附源码见 `crap4clj/`，基于提交 `e90be2e`），与其结果完全一致：只报告顶层 `defn` / `defn-`，计分规则见 `CRAP_GUIDE.md`。函数名为 `命名空间/函数名`。
+
+CRAP 模式优先用 Babashka（`bb`），否则用 Clojure CLI（`clojure` / `clj`）运行 crap4clj。它会在项目中执行 `clj -M:cov --lcov` 生成覆盖率，因此项目需要配置 Cloverage 的 `:cov` 别名（写法见 `crap4clj/README.md`），并依赖 `sh`（Windows 下需 Git Bash 等）。crap4clj 还会在项目里写入 `.metrics/crap.edn` 和 `target/coverage/`。
+
+---
+
 ## 项目配置与 Git 提交门禁
 
 快速启用步骤见 [Git 提交门禁简明说明](docs/git-gate.md)。
@@ -196,7 +212,7 @@ crap check --staged           # 手动检查即将提交的完整内容
 ```
 
 `crap init` 默认使用纯复杂度模式，上限为 12，不覆盖已有配置。
-`crap hook install` 会在目标项目创建 `CRAP_GUIDE.md`，包含 Java/Python/Kotlin 计分规则、算分示例和修改建议；重复安装保留已有文档。门禁失败时会输出文档位置与复查步骤，JSON 的 `gate.help` 也包含这些提示。
+`crap hook install` 会在目标项目创建 `CRAP_GUIDE.md`，包含 Java/Python/Kotlin/Clojure 计分规则、算分示例和修改建议；重复安装保留已有文档。门禁失败时会输出文档位置与复查步骤，JSON 的 `gate.help` 也包含这些提示。
 `crap check` 才会读取项目配置；原有 `crap` / `crap complexity` 参数语义保持一致，`--fail-on-complexity N` 仍表示 CC >= N 拦截。
 配置不允许未知字段，也不能缺少所有阈值。分析失败、无可分析项目/函数、受约束指标为 N/A 均拒绝放行。
 退出码：通过为 `0`，分析/配置错误为 `1`，指标超标为 `2`；`crap check --json` 额外输出 `gate` 的错误和违规明细。

@@ -28,6 +28,8 @@ where = ["src"]
 
 [tool.setuptools.data-files]
 "share/crap-everything/crap4java/src/crap4java" = ["crap4java/src/crap4java/*.java"]
+"share/crap-everything/crap4clj" = ["crap4clj/deps.edn"]
+"share/crap-everything/crap4clj/src/crap4clj" = ["crap4clj/src/crap4clj/*.cljc"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

@@ -58,6 +58,12 @@ lambda 内的分支计入所属方法；局部/匿名类内部的分支不计入
 
 报告顶层函数和类中的直接方法；嵌套函数/类的分支跳过，不单独报告。lambda 中的决策点计入外层。当前 AST 计数也会遍历函数参数默认值和装饰器表达式。`return 1 if ready and valid else 0` 因条件表达式和 `and` 共加 2，函数 CC 为 3。
 
+### Clojure
+
+口径与 crap4clj 相同：去掉字符串和注释后按源码形式计数。基础值 1；每个 `if`、`if-not`、`if-let`、`if-some`、`when`、`when-not`、`when-let`、`when-some`、`when-first`、`and`、`or`、`loop`、`catch` 形式各加 1（`and` / `or` 按出现次数计，不按参数个数）。`cond` 每对“条件 结果”加 1，`:else` 也算一对；`condp` 去掉前两个参数后每对加 1；`case` 每对加 1，末尾的默认值再加 1；`cond->` / `cond->>` 去掉初始值后每对加 1；`some->` / `some->>` 每个后续步骤加 1。
+
+只报告顶层 `defn` / `defn-`；`defmethod`、`fn`、`letfn` 不单独报告，写在函数内的匿名函数分支计入外层。`(defn sign [x] (cond (neg? x) -1 (pos? x) 1 :else 0))` 的 `cond` 有 3 对，CC 为 4。
+
 ## 怎么降低分数
 
 - 从违规函数中提取承担独立职责、能清楚命名的逻辑，例如校验、分类、转换。提取后的函数也会被检查。
